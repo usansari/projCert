@@ -1,0 +1,64 @@
+...
+- hosts: mywebservers
+  user: ansible
+  become: yes
+  connection: ssh 
+  gather_facts: False
+
+  vars:
+   - MyMessage: "Welcome to Ansible world by Subhan!"
+
+  pre_tasks:
+
+  - name: Install docker on linux
+       action: yum name=docker state=installed
+
+  - name: install lamp stack
+      apt:
+        pkg:
+          - php7.4-mysql
+          - php7.4-curl
+          - php7.4-json
+          - php7.4-cgi
+          - php7.4-xsl
+          - php7.4-cgi
+          - php7.4-gd
+          - php7.4-mbstring
+          - php7.4-zip
+          - php7.4-xmlrpc
+          - php7.4-soap
+          - php7.4-intl
+          - libapache2-mod-php
+        state: present
+        update_cache: yes 
+ 
+  - name: install python 2
+    raw: test -e /usr/bin/python || (apt -y update && apt install -y python-minimal)
+
+  tasks:
+     - name: install packages
+      yum: name={{ item }} state=latest update_cache=yes
+      with_items:
+        - git
+        - wget
+        - curl
+
+    - name: install docker
+      shell: curl -sSL https://get.docker.com/ | sh
+      args:
+        creates: /usr/bin/docker
+
+    # required to install docker-py
+    - name: install pip
+      shell: curl https://bootstrap.pypa.io/get-pip.py | python
+      args:
+        creates: /usr/local/bin/pip
+
+    # required by ansible docker module
+    - name: install docker-py
+      pip: name=docker-py version=1.1.0 # v1.1.0 is workaround from https://github.com/ansible/ansible/issues/10879#issuecomment-97738264
+
+    - name: Start docker daemon
+      service: name=docker state=started enabled=yes
+
+   

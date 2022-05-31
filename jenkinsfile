@@ -1,0 +1,69 @@
+pipeline {
+  environment {
+    dockerRegistry = "subhan/demo"
+    dockerRegistryCredential = 'dockerhub'
+    dockerImage = ''
+   }
+  agent any
+ 
+
+  stages {
+   try {
+    stage('Checkout') {
+      steps {
+        git(url: 'https://github.com/usansari/projCert.git', branch: 'master')
+      }
+    }
+
+    stage("PHPLint") {
+        sh 'find app -name "*.php" -print0 | xargs -0 -n1 php -l'
+    }
+
+   
+    stage('Building image') {
+      steps{
+        script {
+          dockerImage = docker.build dockerRegistry + ":$BUILD_NUMBER"
+        }
+      }
+    }
+    stage('Upload Image') {
+      steps{
+        script {
+          docker.withRegistry( '', dockerRegistryCredential ) {
+            dockerImage.push()
+          }
+        }
+      }
+    }
+    stage ('test') {
+	   steps{
+			sh '''#!/bin/bash
+			echo 'testing php app'
+		        cd /var/lib/jenkins/workspace/deployment
+			
+			'''
+			}
+      }
+      
+    stage ('Deploy') {
+           steps {
+               script{
+                   def image_id = registry + ":$BUILD_NUMBER"
+                   sh "ansible-playbook  playbook.yml --extra-vars \"image_id=${image_id}\""
+               }
+           }
+       }
+
+     } catch (e) {
+        currentBuild.result = "FAILED"
+        stage('If failed Remove docker image') {
+        steps{
+        sh "docker rmi $dockerRegistry:$BUILD_NUMBER"
+      }
+    }
+        slack(false)
+        throw e
+    }
+  }
+ }
